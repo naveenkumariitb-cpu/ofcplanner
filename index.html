@@ -13,15 +13,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <style>
 :root{color-scheme:dark}body{-webkit-tap-highlight-color:transparent}.drag-handle{cursor:grab;touch-action:none}.clock-hand{transition:transform .05s ease-out;pointer-events:none}.clock-tip{pointer-events:none;stroke:#0f172a;stroke-width:2}#clockSvg{touch-action:none;user-select:none}input,button{max-width:100%}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.spinning { animation: spin 0.8s linear infinite; }
 </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans pb-12">
 <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-md">
  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
   <div class="flex items-center gap-3"><div class="p-2 bg-indigo-600 rounded-lg">◷</div><div><h1 class="font-bold text-lg text-white">Office Task Duration Tracker</h1><p class="text-xs text-slate-400">Plan tasks • Cloud Synced</p></div></div>
-  <div class="flex flex-wrap gap-2">
-   <!-- Bubble displaying Mobile App's Officework duration fetched from cloud -->
-   <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2"><div class="text-xs text-sky-300">📱 Mobile Officework</div><strong id="mobileOfficeDurationDisplay" class="text-white text-lg font-mono">Loading...</strong></div>
+  <div class="flex flex-wrap gap-2 items-center">
+   <!-- Bubble displaying Mobile App's Officework duration with manual Refresh button -->
+   <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2 flex items-center gap-3">
+    <div>
+     <div class="text-xs text-sky-300">📱 Mobile Officework</div>
+     <strong id="mobileOfficeDurationDisplay" class="text-white text-lg font-mono">Loading...</strong>
+    </div>
+    <button id="refreshMobileBtn" title="Fetch latest duration from mobile" class="bg-sky-800 hover:bg-sky-700 text-white text-xs px-2.5 py-1.5 rounded font-medium flex items-center gap-1 transition">
+     <span id="refreshIcon">🔄</span> Refresh
+    </button>
+   </div>
    <div class="bg-indigo-950/80 border border-indigo-700/50 rounded-lg px-3 py-2"><div class="text-xs text-indigo-300">Total planned</div><strong id="totalDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
    <div class="bg-emerald-950/70 border border-emerald-700/50 rounded-lg px-3 py-2"><div class="text-xs text-emerald-300">Completed</div><strong id="completedDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
   </div>
@@ -54,8 +64,10 @@ function persist(){localStorage.setItem(DESKTOP_STORAGE_KEY,JSON.stringify(state
 function loadSaved(){const raw=localStorage.getItem(DESKTOP_STORAGE_KEY);if(raw){try{state=JSON.parse(raw);}catch(e){}}fetchCloudMobileData();}
 
 async function fetchCloudMobileData() {
+  const icon = $('refreshIcon');
+  if (icon) icon.classList.add('spinning');
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`);
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`);
     const data = await res.json();
     const mins = data?.record?.officeworkDuration;
     if (typeof mins === 'number') {
@@ -67,6 +79,7 @@ async function fetchCloudMobileData() {
   } catch(e) {
     $('mobileOfficeDurationDisplay').textContent = '2h 0m';
   }
+  if (icon) setTimeout(() => icon.classList.remove('spinning'), 500);
 }
 
 function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
@@ -75,6 +88,7 @@ function render(){
  const body=$('taskTableBody');body.innerHTML='';
  state.tasks.forEach(task=>{
   const tr=document.createElement('tr');
+  tr.dataset.id = task.id;
   tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
   tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${task.title.replace(/"/g,'&quot;')}" class="task-title bg-transparent w-full rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><button class="delete-btn text-rose-400 p-1 font-bold">✕</button></td>`;
   tr.querySelector('.task-title').onchange=(e)=>{task.title=e.target.value;persist();};
@@ -83,8 +97,13 @@ function render(){
   body.appendChild(tr);
  });
  summary();
+ if(window.Sortable&&!body.dataset.sortable){Sortable.create(body,{handle:'.drag-handle',animation:150,onEnd:()=>{const order=[...body.querySelectorAll('tr')].map(r=>state.tasks.find(t=>t.id===r.dataset.id)).filter(Boolean);if(order.length===state.tasks.length){state.tasks=order;persist();render();}}});body.dataset.sortable='1';}
 }
-document.addEventListener('DOMContentLoaded',()=>{loadSaved();render();setInterval(fetchCloudMobileData, 30000);});
+document.addEventListener('DOMContentLoaded',()=>{
+  loadSaved();
+  render();
+  $('refreshMobileBtn').onclick = fetchCloudMobileData;
+});
 })();
 </script>
 </body>
