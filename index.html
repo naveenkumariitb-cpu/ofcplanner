@@ -26,7 +26,7 @@
    <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2 flex items-center gap-3">
     <div>
      <div class="text-xs text-sky-300">📱 Mobile Officework</div>
-     <strong id="mobileOfficeDurationDisplay" class="text-white text-lg font-mono">Loading...</strong>
+     <strong id="mobileOfficeDurationDisplay" class="text-white text-lg font-mono">2h 0m</strong>
     </div>
     <button id="refreshMobileBtn" title="Fetch latest duration from mobile" class="bg-sky-800 hover:bg-sky-700 text-white text-xs px-2.5 py-1.5 rounded font-medium flex items-center gap-1 transition">
      <span id="refreshIcon">🔄</span> Refresh
@@ -69,9 +69,7 @@ async function fetchCloudMobileData() {
   if (icon) icon.classList.add('spinning');
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`, {
-      headers: {
-        'X-Master-Key': JSONBIN_API_KEY
-      }
+      headers: { 'X-Master-Key': JSONBIN_API_KEY }
     });
     const data = await res.json();
     const mins = data?.record?.officeworkDuration;
@@ -84,7 +82,7 @@ async function fetchCloudMobileData() {
   } catch(e) {
     $('mobileOfficeDurationDisplay').textContent = '2h 0m';
   }
-  if (icon) setTimeout(() => icon.classList.0 ? icon.classList.remove('spinning') : icon.classList.remove('spinning'), 500);
+  if (icon) icon.classList.remove('spinning');
 }
 
 function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
