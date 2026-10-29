@@ -20,6 +20,8 @@
  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
   <div class="flex items-center gap-3"><div class="p-2 bg-indigo-600 rounded-lg">◷</div><div><h1 class="font-bold text-lg text-white">Office Task Duration Tracker</h1><p class="text-xs text-slate-400">Plan tasks • Track completed time</p></div></div>
   <div class="flex flex-wrap gap-2">
+   <!-- Bubble displaying Mobile App's Officework duration -->
+   <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2"><div class="text-xs text-sky-300">📱 Mobile Officework</div><strong id="mobileOfficeDurationDisplay" class="text-white text-lg font-mono">--</strong></div>
    <div class="bg-indigo-950/80 border border-indigo-700/50 rounded-lg px-3 py-2"><div class="text-xs text-indigo-300">Total planned duration</div><strong id="totalDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
    <div class="bg-emerald-950/70 border border-emerald-700/50 rounded-lg px-3 py-2"><div class="text-xs text-emerald-300">Completed duration</div><strong id="completedDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
   </div>
@@ -35,8 +37,8 @@
   <div class="overflow-x-auto"><table class="w-full text-left border-collapse min-w-[600px]"><thead><tr class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700"><th class="py-3 px-2 text-center w-10">⣿</th><th class="py-3 px-3">Task description</th><th class="py-3 px-3 w-32 text-center">Duration</th><th class="py-3 px-3 w-32 text-center">Status</th><th class="py-3 px-2 text-center w-28">Actions</th></tr></thead><tbody id="taskTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody></table></div>
   <div id="emptyState" class="hidden text-center p-8 text-slate-400 text-sm">No tasks yet. Tap “Add Task” to create your first office task.</div>
  </section>
- <section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4 text-sm text-slate-300"><strong class="text-slate-100">How tracking works:</strong> Total planned duration adds up every task. Completed duration adds up the duration of tasks marked DONE. Mark a task Pending again to subtract its duration from Completed.</section>
- <section class="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm text-amber-100"><strong>Saving tip:</strong> This version autosaves to this browser and includes JSON backups. Use <strong>Export backup</strong> regularly. Browser storage does not automatically sync tasks across devices.</section>
+ <section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4 text-sm text-slate-300"><strong class="text-slate-100">How tracking works:</strong> Total planned duration adds up every task. Completed duration adds up the duration of tasks marked DONE.</section>
+ <section class="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm text-amber-100"><strong>Saving tip:</strong> This desktop app automatically reads the 📱 Mobile Officework duration from domain storage.</section>
 </main>
 <div id="clockModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
@@ -56,7 +58,8 @@
 </div>
 <script>
 (()=>{'use strict';
-const STORAGE_KEY='time_budget_app_state_v2', LEGACY_KEY='time_budget_app_state';
+const DESKTOP_STORAGE_KEY='office_planner_desktop_state';
+const MOBILE_STORAGE_KEY='time_budget_app_state_v2';
 const makeId=()=>`task-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const defaultState=()=>({tasks:[
 {id:makeId(),title:'Email & Daily Planning',duration:30,done:false},
@@ -68,11 +71,34 @@ let state=defaultState(),currentModalTaskId=null,tempModalMinutes=0,isDraggingHa
 const $=id=>document.getElementById(id);
 function normalise(s){if(!s||typeof s!=='object')throw Error('Invalid backup');const d=defaultState();return{tasks:Array.isArray(s.tasks)?s.tasks.map((t,i)=>({id:String(t.id??`task-${Date.now()}-${i}`),title:String(t.title??'Office task'),duration:Math.max(0,Math.min(1440,Number.isFinite(Number(t.duration))?Math.round(Number(t.duration)):30)),done:Boolean(t.done)})):d.tasks};}
 function status(msg,ok=true){$('saveStatus').textContent=msg;$('saveStatus').className='text-xs '+(ok?'text-emerald-300':'text-amber-300');}
-function persist(){const raw=JSON.stringify(state);let saved=false;try{localStorage.setItem(STORAGE_KEY,raw);saved=localStorage.getItem(STORAGE_KEY)===raw;}catch(e){}try{sessionStorage.setItem(STORAGE_KEY,raw);}catch(e){}status(saved?'✓ Saved on this browser':'⚠ Session only — export a backup',saved);return saved;}
-function loadSaved(){let raw=null;try{raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem(LEGACY_KEY);}catch(e){}if(!raw){try{raw=sessionStorage.getItem(STORAGE_KEY);}catch(e){}}if(raw){try{state=normalise(JSON.parse(raw));status('✓ Previous planner data loaded');return;}catch(e){status('⚠ Saved data could not be read; starting with defaults',false);}}else status('New tracker — changes autosave when storage is available');}
+function persist(){const raw=JSON.stringify(state);let saved=false;try{localStorage.setItem(DESKTOP_STORAGE_KEY,raw);saved=localStorage.getItem(DESKTOP_STORAGE_KEY)===raw;}catch(e){}try{sessionStorage.setItem(DESKTOP_STORAGE_KEY,raw);}catch(e){}status(saved?'✓ Saved on this browser':'⚠ Session only — export a backup',saved);return saved;}
+function loadSaved(){let raw=null;try{raw=localStorage.getItem(DESKTOP_STORAGE_KEY);}catch(e){}if(!raw){try{raw=sessionStorage.getItem(DESKTOP_STORAGE_KEY);}catch(e){}}if(raw){try{state=normalise(JSON.parse(raw));status('✓ Previous planner data loaded');}catch(e){status('⚠ Saved data could not be read; starting with defaults',false);}}else status('New tracker — changes autosave when storage is available');
+updateMobileOfficeBubble();
+}
+function updateMobileOfficeBubble(){
+  let officeDurationMinutes = null;
+  try {
+    const mobileRaw = localStorage.getItem(MOBILE_STORAGE_KEY) || localStorage.getItem('time_budget_app_state');
+    if (mobileRaw) {
+      const mobileData = JSON.parse(mobileRaw);
+      if (mobileData && Array.isArray(mobileData.tasks)) {
+        const officeTask = mobileData.tasks.find(t => t.title && t.title.toLowerCase().includes('officework'));
+        if (officeTask) officeDurationMinutes = officeTask.duration;
+      }
+    }
+  } catch(e) {}
+  
+  if (officeDurationMinutes !== null) {
+    const h = Math.floor(officeDurationMinutes / 60);
+    const m = officeDurationMinutes % 60;
+    $('mobileOfficeDurationDisplay').textContent = `${h}h ${m}m`;
+  } else {
+    $('mobileOfficeDurationDisplay').textContent = '2h 0m'; // Default mobile Officework time
+  }
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
-function summary(){$('totalDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+t.duration,0));$('completedDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+(t.done?t.duration:0),0));}
+function summary(){$('totalDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+t.duration,0));$('completedDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+(t.done?t.duration:0),0));updateMobileOfficeBubble();}
 function render(){const body=$('taskTableBody');body.innerHTML='';$('emptyState').classList.toggle('hidden',state.tasks.length!==0);
 state.tasks.forEach(task=>{const tr=document.createElement('tr');tr.dataset.id=task.id;tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
 tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${esc(task.title)}" aria-label="Task description" class="task-title bg-transparent w-full focus:bg-slate-900/80 rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn inline-flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><div class="flex justify-center items-center gap-2"><button class="copy-btn text-sky-300 p-1 text-xs font-semibold" title="Duplicate task">⧉ Copy</button><button class="delete-btn text-rose-400 p-1 font-bold text-base" aria-label="Delete task" title="Delete task">✕</button></div></td>`;
@@ -93,7 +119,9 @@ $('setHoursModeBtn').onclick=()=>setMode('hours');$('setMinutesModeBtn').onclick
 function drag(e){const rect=$('clockSvg').getBoundingClientRect();if(!rect.width||!rect.height)return;const x=(e.clientX-rect.left)*(200/rect.width)-100,y=(e.clientY-rect.top)*(200/rect.height)-100;let a=Math.atan2(x,-y);if(a<0)a+=Math.PI*2;if(clockEditMode==='hours'){let h=Math.round(a/(Math.PI*2)*12)%12;if(h===0)h=12;tempModalMinutes=Math.min(1440,h*60+tempModalMinutes%60);}else{const m=Math.round(a/(Math.PI*2)*60)%60;tempModalMinutes=Math.floor(tempModalMinutes/60)*60+m;}drawHands();}
 function exportBackup(){const blob=new Blob([JSON.stringify({app:'Office Task Duration Tracker',version:3,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`office-task-backup-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);status('✓ Backup exported. Keep the JSON file safe');}
 function importBackup(file){if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);state=normalise(data.state||data);persist();render();alert('Backup imported successfully.');}catch(e){alert('Could not import this file. Choose a valid planner JSON backup.');}};reader.readAsText(file);}
-function setup(){$('addTaskBtn').onclick=()=>{state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});persist();render();const rows=[...$('taskTableBody').querySelectorAll('tr')],field=rows[rows.length-1]?.querySelector('.task-title');if(field){field.focus();field.select();}};$('closeClockModalBtn').onclick=closeClock;$('clockModal').addEventListener('click',e=>{if(e.target===$('clockModal'))closeClock();});$('saveClockBtn').onclick=()=>{const t=state.tasks.find(x=>x.id===currentModalTaskId);if(t){t.duration=tempModalMinutes;persist();render();}closeClock();};document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{tempModalMinutes=Math.min(1440,tempModalMinutes+Number(b.dataset.add));drawHands();});$('clearDurationBtn').onclick=()=>{tempModalMinutes=0;drawHands();};$('saveNowBtn').onclick=()=>alert(persist()?'Planner saved in this browser.':'Browser storage may be unavailable. Please export a backup.');$('exportBtn').onclick=exportBackup;$('importFile').addEventListener('change',e=>{importBackup(e.target.files[0]);e.target.value='';});window.addEventListener('pagehide',persist);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist();});window.addEventListener('beforeunload',persist);}
+function setup(){$('addTaskBtn').onclick=()=>{state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});persist();render();const rows=[...$('taskTableBody').querySelectorAll('tr')],field=rows[rows.length-1]?.querySelector('.task-title');if(field){field.focus();field.select();}};$('closeClockModalBtn').onclick=closeClock;$('clockModal').addEventListener('click',e=>{if(e.target===$('clockModal'))closeClock();});$('saveClockBtn').onclick=()=>{const t=state.tasks.find(x=>x.id===currentModalTaskId);if(t){t.duration=tempModalMinutes;persist();render();}closeClock();};document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{tempModalMinutes=Math.min(1440,tempModalMinutes+Number(b.dataset.add));drawHands();});$('clearDurationBtn').onclick=()=>{tempModalMinutes=0;drawHands();};$('saveNowBtn').onclick=()=>alert(persist()?'Planner saved in this browser.':'Browser storage may be unavailable.');$('exportBtn').onclick=exportBackup;$('importFile').addEventListener('change',e=>{importBackup(e.target.files[0]);e.target.value='';});window.addEventListener('pagehide',persist);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist();});window.addEventListener('beforeunload',persist);
+window.addEventListener('storage', (e) => { if (e.key === MOBILE_STORAGE_KEY || e.key === 'time_budget_app_state') updateMobileOfficeBubble(); });
+}
 document.addEventListener('DOMContentLoaded',()=>{loadSaved();initClock();setup();render();});
 })();
 </script>
