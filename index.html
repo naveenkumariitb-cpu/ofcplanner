@@ -22,7 +22,6 @@
  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
   <div class="flex items-center gap-3"><div class="p-2 bg-indigo-600 rounded-lg">◷</div><div><h1 class="font-bold text-lg text-white">Office Task Duration Tracker</h1><p class="text-xs text-slate-400">Plan tasks • Cloud Synced</p></div></div>
   <div class="flex flex-wrap gap-2 items-center">
-   <!-- Bubble displaying Mobile App's Officework duration fetched from cloud -->
    <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2 flex items-center gap-3">
     <div>
      <div class="text-xs text-sky-300">📱 Mobile Officework</div>
@@ -41,13 +40,40 @@
   <div class="flex flex-wrap gap-2"><button id="saveNowBtn" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded">Save now</button></div>
  </div>
 </header>
+
 <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
  <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
   <div class="p-4 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2"><div><h2 class="text-base font-bold text-white">Office Tasks</h2><span class="text-xs text-slate-400">Drag ⣿ to reorder</span></div><button id="addTaskBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold">+ Add Task</button></div>
-  <div class="overflow-x-auto"><table class="w-full text-left border-collapse min-w-[600px]"><thead><tr class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700"><th class="py-3 px-2 text-center w-10">⣿</th><th class="py-3 px-3">Task description</th><th class="py-3 px-3 w-32 text-center">Duration</th><th class="py-3 px-3 w-32 text-center">Status</th><th class="py-3 px-2 text-center w-28">Actions</th></tr></thead><tbody id="taskTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody></table></div>
+  <div class="overflow-x-auto"><table class="w-full text-left border-collapse min-w-[600px]"><thead><tr class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700"><th class="py-3 px-2 text-center w-10">⣿</th><th class="py-3 px-3">Task description</th><th class="py-3 px-3 w-32 text-center">Duration</th><th class="py-3 px-3 w-32 text-center">Status</th><th class="py-3 px-2 text-center w-36">Actions</th></tr></thead><tbody id="taskTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody></table></div>
   <div id="emptyState" class="hidden text-center p-8 text-slate-400 text-sm">No tasks yet.</div>
  </section>
 </main>
+
+<div id="clockModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+ <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+  <div class="flex items-center justify-between"><h3 class="text-base font-bold">Set Task Duration</h3><button id="closeClockModalBtn" class="text-slate-400 p-1 text-lg">✕</button></div>
+  <div class="text-center py-2 bg-slate-900 rounded-lg border border-slate-700"><span id="modalDurationText" class="text-2xl font-mono font-bold text-indigo-300">0h 0m</span></div>
+  <div class="grid grid-cols-2 gap-2">
+   <button id="setHoursModeBtn" type="button" aria-pressed="false" class="rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold">🟣 Set hours</button>
+   <button id="setMinutesModeBtn" type="button" aria-pressed="true" class="rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200">🔵 Set minutes</button>
+  </div>
+  <p id="clockInstruction" class="text-center text-xs leading-relaxed text-slate-300">Drag around the dial to set minutes.</p>
+  <div class="relative w-60 h-60 max-w-full mx-auto touch-none select-none">
+   <svg id="clockSvg" class="w-full h-full cursor-crosshair" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="95" fill="#0f172a" stroke="#475569" stroke-width="4"/><g id="clockTicks" stroke="#64748b" stroke-width="2"></g><g id="clockNumbers" fill="#e2e8f0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle"></g>
+    <line id="hourHand" class="clock-hand" x1="100" y1="100" x2="100" y2="53" stroke="#a78bfa" stroke-width="7" stroke-linecap="round"/>
+    <line id="minuteHand" class="clock-hand" x1="100" y1="100" x2="100" y2="29" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
+    <circle id="hourTip" class="clock-tip" cx="100" cy="53" r="5" fill="#a78bfa"/><circle id="minuteTip" class="clock-tip" cx="100" cy="29" r="4" fill="#38bdf8"/>
+    <circle cx="100" cy="100" r="6" fill="#f8fafc" stroke="#0f172a" stroke-width="2"/>
+   </svg>
+  </div>
+  <div class="grid grid-cols-5 gap-1.5 text-xs font-semibold">
+   <button data-add="5" class="bg-slate-700 py-2.5 rounded">+5m</button><button data-add="15" class="bg-slate-700 py-2.5 rounded">+15m</button><button data-add="30" class="bg-slate-700 py-2.5 rounded">+30m</button><button data-add="60" class="bg-slate-700 py-2.5 rounded">+1h</button><button id="clearDurationBtn" class="bg-rose-900/60 text-rose-200 py-2.5 rounded">Clear</button>
+  </div>
+  <button id="saveClockBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-xl">Apply Duration</button>
+ </div>
+</div>
+
 <script>
 (()=>{'use strict';
 const DESKTOP_STORAGE_KEY='office_planner_desktop_state';
@@ -59,10 +85,19 @@ const defaultState=()=>({tasks:[
 {id:makeId(),title:'Focused Work',duration:120,done:false},
 {id:makeId(),title:'Meetings & Collaboration',duration:60,done:false}
 ]});
-let state=defaultState();
+let state=defaultState(), currentModalTaskId=null, tempModalMinutes=0, isDraggingHand=false, clockEditMode='minutes';
 const $=id=>document.getElementById(id);
-function persist(){localStorage.setItem(DESKTOP_STORAGE_KEY,JSON.stringify(state));}
-function loadSaved(){const raw=localStorage.getItem(DESKTOP_STORAGE_KEY);if(raw){try{state=JSON.parse(raw);}catch(e){}}fetchCloudMobileData();}
+
+function persist(){
+  localStorage.setItem(DESKTOP_STORAGE_KEY,JSON.stringify(state));
+  $('saveStatus').textContent='✓ Saved locally';
+}
+
+function loadSaved(){
+  const raw=localStorage.getItem(DESKTOP_STORAGE_KEY);
+  if(raw){try{state=JSON.parse(raw);}catch(e){}}
+  fetchCloudMobileData();
+}
 
 async function fetchCloudMobileData() {
   const icon = $('refreshIcon');
@@ -86,26 +121,126 @@ async function fetchCloudMobileData() {
 }
 
 function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
-function summary(){$('totalDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+t.duration,0));$('completedDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+(t.done?t.duration:0),0));}
+function summary(){
+  $('totalDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+t.duration,0));
+  $('completedDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+(t.done?t.duration:0),0));
+}
+
+function openClock(id){
+  currentModalTaskId=id;
+  const t=state.tasks.find(x=>x.id===id);
+  tempModalMinutes=t?t.duration:30;
+  setMode('minutes');
+  drawHands();
+  $('clockModal').classList.remove('hidden');
+  $('clockModal').classList.add('flex');
+}
+
+function closeClock(){
+  $('clockModal').classList.add('hidden');
+  $('clockModal').classList.remove('flex');
+  isDraggingHand=false;
+}
+
+function setMode(mode){
+  clockEditMode=mode;
+  const hours=mode==='hours';
+  $('setHoursModeBtn').setAttribute('aria-pressed',String(hours));
+  $('setMinutesModeBtn').setAttribute('aria-pressed',String(!hours));
+  $('setHoursModeBtn').className=hours?'rounded-lg border border-violet-400 bg-violet-950 py-2.5 text-sm font-bold text-violet-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';
+  $('setMinutesModeBtn').className=!hours?'rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';
+  if($('clockInstruction')) $('clockInstruction').textContent=hours?'Drag around the dial to set hours.':'Drag around the dial to set minutes.';
+  drawHands();
+}
+
+function drawHands(){
+  tempModalMinutes=Math.max(0,Math.min(1440,Math.round(tempModalMinutes)));
+  $('modalDurationText').textContent=fmt(tempModalMinutes);
+  const totalH=Math.floor(tempModalMinutes/60),h=totalH%12,m=tempModalMinutes%60,ha=h*30+(m/60)*30,ma=m*6;
+  $('hourHand').setAttribute('transform',`rotate(${ha} 100 100)`);
+  $('minuteHand').setAttribute('transform',`rotate(${ma} 100 100)`);
+  const pt=(a,r)=>({x:100+r*Math.sin(a*Math.PI/180),y:100-r*Math.cos(a*Math.PI/180)}),hp=pt(ha,47),mp=pt(ma,71);
+  $('hourTip').setAttribute('cx',hp.x);$('hourTip').setAttribute('cy',hp.y);
+  $('minuteTip').setAttribute('cx',mp.x);$('minuteTip').setAttribute('cy',mp.y);
+}
+
+function initClock(){
+  const g=$('clockTicks'),nums=$('clockNumbers');
+  g.innerHTML=''; nums.innerHTML='';
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6,x1=100+80*Math.sin(a),y1=100-80*Math.cos(a),x2=100+90*Math.sin(a),y2=100-90*Math.cos(a),line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    [['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(([k,v])=>line.setAttribute(k,v));g.appendChild(line);
+    const label=document.createElementNS('http://www.w3.org/2000/svg','text'),r=68;
+    label.setAttribute('x',100+r*Math.sin(a));label.setAttribute('y',100-r*Math.cos(a));label.textContent=String(i===0?12:i);nums.appendChild(label);
+  }
+  $('setHoursModeBtn').onclick=()=>setMode('hours');
+  $('setMinutesModeBtn').onclick=()=>setMode('minutes');
+  $('closeClockModalBtn').onclick=closeClock;
+  $('clockModal').onclick=(e)=>{if(e.target===$('clockModal'))closeClock();};
+  $('saveClockBtn').onclick=()=>{
+    const t=state.tasks.find(x=>x.id===currentModalTaskId);
+    if(t){t.duration=tempModalMinutes;persist();render();}
+    closeClock();
+  };
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
+    tempModalMinutes=Math.min(1440,tempModalMinutes+Number(b.dataset.add));
+    drawHands();
+  });
+  $('clearDurationBtn').onclick=()=>{tempModalMinutes=0;drawHands();};
+  $('clockSvg').addEventListener('pointerdown',e=>{isDraggingHand=true;$('clockSvg').setPointerCapture?.(e.pointerId);drag(e);});
+  $('clockSvg').addEventListener('pointermove',e=>{if(isDraggingHand)drag(e);});
+  $('clockSvg').addEventListener('pointerup',()=>isDraggingHand=false);
+  $('clockSvg').addEventListener('pointercancel',()=>isDraggingHand=false);
+}
+
+function drag(e){
+  const rect=$('clockSvg').getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  const x=(e.clientX-rect.left)*(200/rect.width)-100,y=(e.clientY-rect.top)*(200/rect.height)-100;
+  let a=Math.atan2(x,-y);if(a<0)a+=Math.PI*2;
+  if(clockEditMode==='hours'){let h=Math.round(a/(Math.PI*2)*12)%12;if(h===0)h=12;tempModalMinutes=Math.min(1440,h*60+tempModalMinutes%60);}
+  else{const m=Math.round(a/(Math.PI*2)*60)%60;tempModalMinutes=Math.floor(tempModalMinutes/60)*60+m;}
+  drawHands();
+}
+
 function render(){
  const body=$('taskTableBody');body.innerHTML='';
  state.tasks.forEach(task=>{
   const tr=document.createElement('tr');
   tr.dataset.id = task.id;
   tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
-  tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${task.title.replace(/"/g,'&quot;')}" class="task-title bg-transparent w-full rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><button class="delete-btn text-rose-400 p-1 font-bold">✕</button></td>`;
+  tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${task.title.replace(/"/g,'&quot;')}" class="task-title bg-transparent w-full rounded px-1.5 py-1 text-sm ${task.done?'line-string text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><div class="flex justify-center items-center gap-2"><button class="copy-btn text-sky-300 p-1 text-xs font-semibold" title="Duplicate task">⧉ Copy</button><button class="delete-btn text-rose-400 p-1 font-bold" title="Delete">✕</button></div></td>`;
   tr.querySelector('.task-title').onchange=(e)=>{task.title=e.target.value;persist();};
+  tr.querySelector('.duration-btn').onclick=()=>openClock(task.id);
   tr.querySelector('.done-btn').onclick=()=>{task.done=!task.done;persist();render();};
+  tr.querySelector('.copy-btn').onclick=()=>{
+    const copy={id:makeId(), title:task.title+' (Copy)', duration:task.duration, done:false};
+    const i=state.tasks.findIndex(t=>t.id===task.id);
+    state.tasks.splice(i+1,0,copy);
+    persist(); render();
+    const row=[...body.querySelectorAll('tr')].find(r=>r.dataset.id===copy.id);
+    if(row){const f=row.querySelector('.task-title');f.focus();f.select();}
+  };
   tr.querySelector('.delete-btn').onclick=()=>{if(confirm('Delete?')){state.tasks=state.tasks.filter(t=>t.id!==task.id);persist();render();}};
   body.appendChild(tr);
  });
  summary();
  if(window.Sortable&&!body.dataset.sortable){Sortable.create(body,{handle:'.drag-handle',animation:150,onEnd:()=>{const order=[...body.querySelectorAll('tr')].map(r=>state.tasks.find(t=>t.id===r.dataset.id)).filter(Boolean);if(order.length===state.tasks.length){state.tasks=order;persist();render();}}});body.dataset.sortable='1';}
 }
+
 document.addEventListener('DOMContentLoaded',()=>{
   loadSaved();
+  initClock();
   render();
   $('refreshMobileBtn').onclick = fetchCloudMobileData;
+  $('addTaskBtn').onclick=()=>{
+    state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});
+    persist(); render();
+    const rows=[...body.querySelectorAll('tr')];
+    const f=rows[rows.length-1]?.querySelector('.task-title');
+    if(f){f.focus();f.select();}
+  };
+  $('saveNowBtn').onclick=()=>alert('Saved successfully in local storage.');
 });
 })();
 </script>
