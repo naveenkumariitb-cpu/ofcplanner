@@ -1,340 +1,102 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Time Budget Planner</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Office Task Duration Tracker</title>
 <meta name="theme-color" content="#0f172a">
-<meta name="description" content="Plan daily activities, durations, and schedule reminders.">
+<meta name="description" content="Track planned and completed office task durations.">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <style>
-  :root { color-scheme: dark; }
-  body { -webkit-tap-highlight-color: transparent; }
-  .drag-handle { cursor: grab; touch-action: none; }
-  .clock-hand { transition: transform .05s ease-out; pointer-events: none; }
-  .clock-tip { pointer-events: none; stroke: #0f172a; stroke-width: 2; }
-  #clockSvg { touch-action: none; user-select: none; }
-  input, button { max-width: 100%; }
-  .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+:root{color-scheme:dark}body{-webkit-tap-highlight-color:transparent}.drag-handle{cursor:grab;touch-action:none}.clock-hand{transition:transform .05s ease-out;pointer-events:none}.clock-tip{pointer-events:none;stroke:#0f172a;stroke-width:2}#clockSvg{touch-action:none;user-select:none}input,button{max-width:100%}
 </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans pb-12">
 <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-md">
  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-  <div class="flex items-center gap-3">
-   <div class="p-2 bg-indigo-600 rounded-lg">◷</div>
-   <div><h1 class="font-bold text-lg text-white">Time Budget Planner</h1><p class="text-xs text-slate-400">Sequential Auto-Calculation & Schedule Review</p></div>
-  </div>
-  <div class="flex flex-wrap items-center gap-2">
-   <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-lg border border-slate-700">
-    <span class="text-xs text-slate-400 px-1">Start:</span>
-    <input type="datetime-local" id="baseStartTime" class="bg-slate-800 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600">
-    <button id="syncNowBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded font-medium">⚡ Sync NOW</button>
-   </div>
-   <div class="bg-indigo-950/80 border border-indigo-700/50 rounded-lg px-3 py-2 text-xs">
-    <span class="text-indigo-300">Target Bedtime:</span> <strong id="targetBedtimeDisplay" class="text-white text-sm">--:--</strong>
-    <span id="sleepStatusBadge" class="ml-1 text-emerald-300">● Calculated</span>
-   </div>
+  <div class="flex items-center gap-3"><div class="p-2 bg-indigo-600 rounded-lg">◷</div><div><h1 class="font-bold text-lg text-white">Office Task Duration Tracker</h1><p class="text-xs text-slate-400">Plan tasks • Track completed time</p></div></div>
+  <div class="flex flex-wrap gap-2">
+   <div class="bg-indigo-950/80 border border-indigo-700/50 rounded-lg px-3 py-2"><div class="text-xs text-indigo-300">Total planned duration</div><strong id="totalDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
+   <div class="bg-emerald-950/70 border border-emerald-700/50 rounded-lg px-3 py-2"><div class="text-xs text-emerald-300">Completed duration</div><strong id="completedDurationDisplay" class="text-white text-lg font-mono">0h 0m</strong></div>
   </div>
  </div>
  <div class="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap items-center justify-between gap-2">
   <p id="saveStatus" role="status" class="text-xs text-emerald-300">Loading saved planner…</p>
-  <div class="flex flex-wrap gap-2">
-   <button id="saveNowBtn" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded">Save now</button>
-   <button id="exportBtn" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded">Export backup</button>
-   <label class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded cursor-pointer">Import backup<input id="importFile" type="file" accept=".json,application/json" class="hidden"></label>
-  </div>
+  <div class="flex flex-wrap gap-2"><button id="saveNowBtn" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded">Save now</button><button id="exportBtn" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded">Export backup</button><label class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded cursor-pointer">Import backup<input id="importFile" type="file" accept=".json,application/json" class="hidden"></label></div>
  </div>
 </header>
-
 <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
- <section class="bg-slate-800/90 rounded-xl p-4 border border-slate-700 shadow-sm space-y-3">
-  <div class="flex items-center justify-between border-b border-slate-700/60 pb-2 gap-2">
-   <div class="flex items-center gap-2"><span class="text-amber-400">🔔</span><h2 class="text-sm font-semibold text-slate-200">Daily Schedule Review Reminders</h2></div>
-   <button id="addAlarmBtn" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded border border-slate-600">+ Add Review Alarm</button>
-  </div>
-  <div id="alarmsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
-  <p class="text-xs text-slate-400">Reminder alerts only work while this page is open and the browser allows it.</p>
- </section>
  <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
-  <div class="p-4 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
-   <div><h2 class="text-base font-bold text-white">Daily Activities Schedule</h2><span class="text-xs text-slate-400">Drag ⣿ to reorder activities</span></div>
-   <button id="addTaskBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold">+ Add Activity</button>
-  </div>
-  <div class="overflow-x-auto">
-   <table class="w-full text-left border-collapse min-w-[760px]">
-    <thead><tr class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700">
-     <th class="py-3 px-2 text-center w-10">⣿</th><th class="py-3 px-3">Activity Description</th><th class="py-3 px-3 w-32 text-center">Duration</th><th class="py-3 px-3 w-28 text-center">Start Time</th><th class="py-3 px-3 w-28 text-center">End Time</th><th class="py-3 px-3 w-32 text-center">Status</th><th class="py-3 px-2 text-center w-16">Action</th>
-    </tr></thead><tbody id="taskTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody>
-   </table>
-  </div>
+  <div class="p-4 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2"><div><h2 class="text-base font-bold text-white">Office Tasks</h2><span class="text-xs text-slate-400">Drag ⣿ to reorder • Mark a task DONE to add its duration to Completed</span></div><button id="addTaskBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold">+ Add Task</button></div>
+  <div class="overflow-x-auto"><table class="w-full text-left border-collapse min-w-[600px]"><thead><tr class="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700"><th class="py-3 px-2 text-center w-10">⣿</th><th class="py-3 px-3">Task description</th><th class="py-3 px-3 w-32 text-center">Duration</th><th class="py-3 px-3 w-32 text-center">Status</th><th class="py-3 px-2 text-center w-28">Actions</th></tr></thead><tbody id="taskTableBody" class="divide-y divide-slate-700/60 text-sm"></tbody></table></div>
+  <div id="emptyState" class="hidden text-center p-8 text-slate-400 text-sm">No tasks yet. Tap “Add Task” to create your first office task.</div>
  </section>
- <section class="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm text-amber-100">
-  <strong>Important about saving:</strong> This version autosaves to this browser's local storage and offers JSON backups. If you use it inside a Google Sites/Gemini preview that clears embedded storage, use <strong>Export backup</strong> before leaving and <strong>Import backup</strong> when needed. For dependable syncing across devices, the app needs cloud storage or a hosted backend.
- </section>
+ <section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4 text-sm text-slate-300"><strong class="text-slate-100">How tracking works:</strong> Total planned duration adds up every task. Completed duration adds up the duration of tasks marked DONE. Mark a task Pending again to subtract its duration from Completed.</section>
+ <section class="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm text-amber-100"><strong>Saving tip:</strong> This version autosaves to this browser and includes JSON backups. Use <strong>Export backup</strong> regularly. Browser storage does not automatically sync tasks across devices.</section>
 </main>
-
 <div id="clockModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
-  <div class="flex items-center justify-between"><h3 class="text-base font-bold">Set Duration</h3><button id="closeClockModalBtn" class="text-slate-400 p-1 text-lg">✕</button></div>
+  <div class="flex items-center justify-between"><h3 class="text-base font-bold">Set Task Duration</h3><button id="closeClockModalBtn" class="text-slate-400 p-1 text-lg" aria-label="Close">✕</button></div>
   <div class="text-center py-2 bg-slate-900 rounded-lg border border-slate-700"><span id="modalDurationText" class="text-2xl font-mono font-bold text-indigo-300">0h 0m</span></div>
-  <div class="grid grid-cols-2 gap-2" role="group" aria-label="Choose which part of duration to set">
-   <button id="setHoursModeBtn" type="button" aria-pressed="false" class="rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold">🟣 Set hours</button>
-   <button id="setMinutesModeBtn" type="button" aria-pressed="true" class="rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200">🔵 Set minutes</button>
-  </div>
-  <p id="clockInstruction" class="text-center text-xs leading-relaxed text-slate-300">Drag around the clock face to set the minutes. The blue hand shows minutes.</p>
-  <div class="relative w-60 h-60 max-w-full mx-auto touch-none select-none">
-   <svg id="clockSvg" class="w-full h-full cursor-crosshair" viewBox="0 0 200 200" role="img" aria-label="Duration dial. Drag around the face to set the selected unit.">
-    <circle cx="100" cy="100" r="95" fill="#0f172a" stroke="#475569" stroke-width="4"/><g id="clockTicks" stroke="#64748b" stroke-width="2"></g><g id="clockNumbers" fill="#e2e8f0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle"></g>
-    <line id="hourHand" class="clock-hand" x1="100" y1="100" x2="100" y2="53" stroke="#a78bfa" stroke-width="7" stroke-linecap="round"/>
-    <line id="minuteHand" class="clock-hand" x1="100" y1="100" x2="100" y2="29" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
-    <circle id="hourTip" class="clock-tip" cx="100" cy="53" r="5" fill="#a78bfa"/><circle id="minuteTip" class="clock-tip" cx="100" cy="29" r="4" fill="#38bdf8"/>
-    <circle cx="100" cy="100" r="6" fill="#f8fafc" stroke="#0f172a" stroke-width="2"/>
-   </svg>
-  </div>
-  <p class="text-center text-[11px] text-slate-400">Quick adjust: add time below, or tap Clear to reset.</p>
-  <div class="grid grid-cols-5 gap-1.5 text-xs font-semibold">
-   <button data-add="5" class="bg-slate-700 hover:bg-slate-600 py-2.5 rounded">+5m</button><button data-add="15" class="bg-slate-700 hover:bg-slate-600 py-2.5 rounded">+15m</button><button data-add="30" class="bg-slate-700 hover:bg-slate-600 py-2.5 rounded">+30m</button><button data-add="60" class="bg-slate-700 hover:bg-slate-600 py-2.5 rounded">+1h</button><button id="clearDurationBtn" class="bg-rose-900/60 text-rose-200 py-2.5 rounded">Clear</button>
-  </div>
+  <div class="grid grid-cols-2 gap-2"><button id="setHoursModeBtn" type="button" aria-pressed="false" class="rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold">🟣 Set hours</button><button id="setMinutesModeBtn" type="button" aria-pressed="true" class="rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200">🔵 Set minutes</button></div>
+  <p id="clockInstruction" class="text-center text-xs leading-relaxed text-slate-300">Drag around the clock face to set minutes. Blue = minutes.</p>
+  <div class="relative w-60 h-60 max-w-full mx-auto touch-none select-none"><svg id="clockSvg" class="w-full h-full cursor-crosshair" viewBox="0 0 200 200" role="img" aria-label="Duration dial">
+   <circle cx="100" cy="100" r="95" fill="#0f172a" stroke="#475569" stroke-width="4"/><g id="clockTicks" stroke="#64748b" stroke-width="2"></g><g id="clockNumbers" fill="#e2e8f0" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle"></g>
+   <line id="hourHand" class="clock-hand" x1="100" y1="100" x2="100" y2="53" stroke="#a78bfa" stroke-width="7" stroke-linecap="round"/><line id="minuteHand" class="clock-hand" x1="100" y1="100" x2="100" y2="29" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
+   <circle id="hourTip" class="clock-tip" cx="100" cy="53" r="5" fill="#a78bfa"/><circle id="minuteTip" class="clock-tip" cx="100" cy="29" r="4" fill="#38bdf8"/><circle cx="100" cy="100" r="6" fill="#f8fafc" stroke="#0f172a" stroke-width="2"/>
+  </svg></div>
+  <p class="text-center text-[11px] text-slate-400">Tap or drag the clock, or use quick adjustments.</p>
+  <div class="grid grid-cols-5 gap-1.5 text-xs font-semibold"><button data-add="5" class="bg-slate-700 py-2.5 rounded">+5m</button><button data-add="15" class="bg-slate-700 py-2.5 rounded">+15m</button><button data-add="30" class="bg-slate-700 py-2.5 rounded">+30m</button><button data-add="60" class="bg-slate-700 py-2.5 rounded">+1h</button><button id="clearDurationBtn" class="bg-rose-900/60 text-rose-200 py-2.5 rounded">Clear</button></div>
   <button id="saveClockBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2.5 rounded-xl">Apply Duration</button>
  </div>
 </div>
-
 <script>
-(() => {
- 'use strict';
- const STORAGE_KEY = 'time_budget_app_state_v2';
- const LEGACY_KEY = 'time_budget_app_state';
- const defaultState = () => ({
-  baseStartTime: formatDateTimeLocal(new Date()),
-  tasks: [
-   {id:'1',title:'Meal & Refreshment',duration:30,done:false},
-   {id:'2',title:'Car & Scooty Cleaning',duration:15,done:false},
-   {id:'3',title:'Gym & Workout',duration:45,done:false},
-   {id:'4',title:'Office Work - Deep Focus',duration:120,done:false},
-   {id:'5',title:'Lunch & Rest',duration:40,done:false},
-   {id:'6',title:'Daughter Olympiad Practice',duration:90,done:false}
-  ],
-  alarms:[
-   {id:'m1',label:'Morning Check-in',time:'10:00',enabled:true},
-   {id:'a1',label:'Noon Review',time:'14:00',enabled:true},
-   {id:'e1',label:'Evening Prep',time:'20:00',enabled:true}
-  ]
- });
- let state = defaultState(), currentModalTaskId = null, tempModalMinutes = 0, isDraggingHand = false, clockEditMode = 'minutes';
- const $ = id => document.getElementById(id);
- function formatDateTimeLocal(d) {
-  const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
- }
- function normalise(s) {
-  if (!s || typeof s !== 'object') throw new Error('Invalid backup data');
-  const d = defaultState();
-  return {
-   baseStartTime: typeof s.baseStartTime === 'string' && s.baseStartTime ? s.baseStartTime : d.baseStartTime,
-   tasks: Array.isArray(s.tasks) ? s.tasks.map((t,i)=>({
-    id:String(t.id ?? `task-${Date.now()}-${i}`), title:String(t.title ?? 'Activity'),
-    duration:Math.max(0,Math.min(1440,Number.isFinite(Number(t.duration))?Math.round(Number(t.duration)):30)), done:Boolean(t.done)
-   })) : d.tasks,
-   alarms: Array.isArray(s.alarms) ? s.alarms.map((a,i)=>({
-    id:String(a.id ?? `alarm-${Date.now()}-${i}`), label:String(a.label ?? 'Review'),
-    time:/^\d{2}:\d{2}$/.test(a.time) ? a.time : '12:00', enabled:Boolean(a.enabled)
-   })) : d.alarms
-  };
- }
- function setSaveStatus(message, ok=true) {
-  $('saveStatus').textContent = message;
-  $('saveStatus').className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300');
- }
- function persist() {
-  const serialized = JSON.stringify(state);
-  let saved = false, errors = [];
-  try { localStorage.setItem(STORAGE_KEY, serialized); saved = localStorage.getItem(STORAGE_KEY) === serialized; }
-  catch(e) { errors.push('browser storage unavailable'); }
-  // Keep a session copy as a fallback while this tab remains open.
-  try { sessionStorage.setItem(STORAGE_KEY, serialized); } catch(e) {}
-  setSaveStatus(saved ? '✓ Saved on this browser' : '⚠ Changes are only in this session — export a backup', saved);
-  return saved;
- }
- function loadSaved() {
-  let raw = null;
-  try { raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY); } catch(e) {}
-  if (!raw) { try { raw = sessionStorage.getItem(STORAGE_KEY); } catch(e) {} }
-  if (raw) {
-   try { state = normalise(JSON.parse(raw)); setSaveStatus('✓ Previous planner data loaded'); return; }
-   catch(e) { setSaveStatus('⚠ Saved data could not be read; starting with defaults', false); }
-  } else {
-   state = defaultState();
-   setSaveStatus('New planner — changes will autosave when storage is available');
-  }
- }
- function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
- function formatDuration(mins) { return `${Math.floor(mins/60)}h ${mins%60}m`; }
- function formatTimeOfDay(d) {
-  if (Number.isNaN(d.getTime())) return '--:--';
-  let h=d.getHours(); const m=String(d.getMinutes()).padStart(2,'0'), ap=h>=12?'PM':'AM'; h=h%12||12;
-  return `${h}:${m} ${ap}`;
- }
- function render() {
-  const tbody=$('taskTableBody'); tbody.innerHTML='';
-  let pointer=new Date(state.baseStartTime);
-  state.tasks.forEach(task=>{
-   const start=new Date(pointer), end=new Date(start.getTime()+(task.done?0:task.duration)*60000); pointer=end;
-   const tr=document.createElement('tr'); tr.dataset.id=task.id;
-   tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
-   tr.innerHTML=`
-    <td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td>
-    <td class="py-3 px-3"><input type="text" value="${escapeHtml(task.title)}" aria-label="Activity description" class="task-title bg-transparent w-full focus:bg-slate-900/80 rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td>
-    <td class="py-3 px-3 text-center"><button class="duration-btn inline-flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${formatDuration(task.duration)}</button></td>
-    <td class="py-3 px-3 text-center font-mono text-xs text-slate-300">${formatTimeOfDay(start)}</td>
-    <td class="py-3 px-3 text-center font-mono text-xs text-indigo-300 font-semibold">${formatTimeOfDay(end)}</td>
-    <td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td>
-    <td class="py-3 px-2 text-center"><button class="delete-btn text-rose-400 p-1 font-bold text-base" aria-label="Delete activity">✕</button></td>`;
-   tr.querySelector('.task-title').addEventListener('change',e=>{task.title=e.target.value;persist();});
-   tr.querySelector('.duration-btn').addEventListener('click',()=>openClockModal(task.id));
-   tr.querySelector('.done-btn').addEventListener('click',()=>{task.done=!task.done;persist();render();});
-   tr.querySelector('.delete-btn').addEventListener('click',()=>{if(confirm(`Delete "${task.title}"?`)){state.tasks=state.tasks.filter(t=>t.id!==task.id);persist();render();}});
-   tbody.appendChild(tr);
-  });
-  $('targetBedtimeDisplay').textContent=formatTimeOfDay(pointer);
-  renderAlarms();
-  $('baseStartTime').value=state.baseStartTime;
-  if (window.Sortable && !tbody.dataset.sortable) {
-   Sortable.create(tbody,{handle:'.drag-handle',animation:150,onEnd:()=>{
-    const order=[...tbody.querySelectorAll('tr')].map(tr=>state.tasks.find(t=>t.id===tr.dataset.id)).filter(Boolean);
-    if(order.length===state.tasks.length){state.tasks=order;persist();render();}
-   }});
-   tbody.dataset.sortable='1';
-  }
- }
- function renderAlarms() {
-  const container=$('alarmsContainer'); container.innerHTML='';
-  state.alarms.forEach(alarm=>{
-   const card=document.createElement('div');
-   card.className=`p-3 rounded-lg border flex items-center justify-between gap-2 ${alarm.enabled?'bg-slate-900/80 border-indigo-500/40':'bg-slate-900/30 border-slate-800 opacity-60'}`;
-   card.innerHTML=`<div class="space-y-1 min-w-0"><input aria-label="Reminder name" type="text" value="${escapeHtml(alarm.label)}" class="alarm-label bg-transparent text-xs font-semibold text-slate-300 w-full"><input aria-label="Reminder time" type="time" value="${alarm.time}" class="alarm-time bg-slate-800 text-slate-100 text-sm font-bold font-mono rounded px-1.5 py-0.5 border border-slate-700"></div><div class="flex items-center gap-2"><input aria-label="Enable reminder" type="checkbox" ${alarm.enabled?'checked':''} class="alarm-enabled w-4 h-4 accent-indigo-600"><button class="delete-alarm text-slate-500 hover:text-rose-400 text-xs" aria-label="Delete reminder">✕</button></div>`;
-   card.querySelector('.alarm-label').addEventListener('change',e=>{alarm.label=e.target.value;persist();});
-   card.querySelector('.alarm-time').addEventListener('change',e=>{alarm.time=e.target.value;persist();});
-   card.querySelector('.alarm-enabled').addEventListener('change',e=>{alarm.enabled=e.target.checked;persist();renderAlarms();});
-   card.querySelector('.delete-alarm').addEventListener('click',()=>{state.alarms=state.alarms.filter(a=>a.id!==alarm.id);persist();renderAlarms();});
-   container.appendChild(card);
-  });
- }
- function openClockModal(id) {
-  currentModalTaskId=id; const t=state.tasks.find(x=>x.id===id); tempModalMinutes=t?t.duration:30;
-  setClockEditMode('minutes'); updateClockHandsDisplay(); $('clockModal').classList.remove('hidden'); $('clockModal').classList.add('flex');
- }
- function closeClockModal() { $('clockModal').classList.add('hidden'); $('clockModal').classList.remove('flex'); isDraggingHand=false; }
- function setClockEditMode(mode) {
-  clockEditMode=mode;
-  const hours=mode==='hours';
-  $('setHoursModeBtn').setAttribute('aria-pressed',String(hours));
-  $('setMinutesModeBtn').setAttribute('aria-pressed',String(!hours));
-  $('setHoursModeBtn').className=hours?'rounded-lg border border-violet-400 bg-violet-950 py-2.5 text-sm font-bold text-violet-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';
-  $('setMinutesModeBtn').className=!hours?'rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';
-  $('clockInstruction').textContent=hours?'Drag around the clock face to set hours (1–12). Use +1h below for longer durations. The purple hand shows hours.':'Drag around the clock face to set minutes (0–59). The blue hand shows minutes.';
-  updateClockHandsDisplay();
- }
- function updateClockHandsDisplay() {
-  tempModalMinutes=Math.max(0,Math.min(1440,Math.round(tempModalMinutes)));
-  $('modalDurationText').textContent=formatDuration(tempModalMinutes);
-  const totalHours=Math.floor(tempModalMinutes/60), h=totalHours%12, m=tempModalMinutes%60;
-  const hourAngle=(h*30+(m/60)*30), minuteAngle=m*6;
-  $('hourHand').setAttribute('transform',`rotate(${hourAngle} 100 100)`);
-  $('minuteHand').setAttribute('transform',`rotate(${minuteAngle} 100 100)`);
-  const point=(angle,r)=>({x:100+r*Math.sin(angle*Math.PI/180),y:100-r*Math.cos(angle*Math.PI/180)});
-  const hp=point(hourAngle,47), mp=point(minuteAngle,71);
-  $('hourTip').setAttribute('cx',hp.x);$('hourTip').setAttribute('cy',hp.y);
-  $('minuteTip').setAttribute('cx',mp.x);$('minuteTip').setAttribute('cy',mp.y);
-  $('hourHand').setAttribute('opacity',clockEditMode==='hours'?'1':'.78');
-  $('minuteHand').setAttribute('opacity',clockEditMode==='minutes'?'1':'.72');
-  $('hourTip').setAttribute('r',clockEditMode==='hours'?'6':'4');
-  $('minuteTip').setAttribute('r',clockEditMode==='minutes'?'5':'3');
- }
- function initClock() {
-  const g=$('clockTicks'), numbers=$('clockNumbers');
-  for(let i=0;i<12;i++){
-   const a=i*Math.PI/6,x1=100+80*Math.sin(a),y1=100-80*Math.cos(a),x2=100+90*Math.sin(a),y2=100-90*Math.cos(a),line=document.createElementNS('http://www.w3.org/2000/svg','line');
-   [['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(([k,v])=>line.setAttribute(k,v));g.appendChild(line);
-   const label=document.createElementNS('http://www.w3.org/2000/svg','text'), nr=68, nx=100+nr*Math.sin(a), ny=100-nr*Math.cos(a);
-   label.setAttribute('x',nx);label.setAttribute('y',ny);label.textContent=String(i===0?12:i);numbers.appendChild(label);
-  }
-  $('setHoursModeBtn').addEventListener('click',()=>setClockEditMode('hours'));
-  $('setMinutesModeBtn').addEventListener('click',()=>setClockEditMode('minutes'));
-  $('clockSvg').addEventListener('pointerdown',e=>{isDraggingHand=true;$('clockSvg').setPointerCapture?.(e.pointerId);dragHand(e);});
-  $('clockSvg').addEventListener('pointermove',e=>{if(isDraggingHand)dragHand(e);});
-  $('clockSvg').addEventListener('pointerup',()=>isDraggingHand=false);
-  $('clockSvg').addEventListener('pointercancel',()=>isDraggingHand=false);
- }
- function dragHand(e) {
-  const rect=$('clockSvg').getBoundingClientRect();
-  if(!rect.width||!rect.height)return;
-  const x=(e.clientX-rect.left)*(200/rect.width)-100,y=(e.clientY-rect.top)*(200/rect.height)-100;
-  let angle=Math.atan2(x,-y); if(angle<0)angle+=Math.PI*2;
-  if(clockEditMode==='hours'){
-   let hours=Math.round(angle/(Math.PI*2)*12)%12; if(hours===0)hours=12;
-   const minutes=tempModalMinutes%60;
-   tempModalMinutes=Math.min(1440,hours*60+minutes);
-  } else {
-   const minutes=Math.round(angle/(Math.PI*2)*60)%60;
-   tempModalMinutes=Math.floor(tempModalMinutes/60)*60+minutes;
-  }
-  updateClockHandsDisplay();
- }
- function exportBackup() {
-  const blob=new Blob([JSON.stringify({app:'Time Budget Planner',version:2,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`time-budget-backup-${formatDateTimeLocal(new Date()).replace(/[:]/g,'-')}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  setSaveStatus('✓ Backup exported. Keep the JSON file somewhere safe');
- }
- function importBackup(file) {
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=()=>{try{const data=JSON.parse(reader.result);state=normalise(data.state||data);persist();render();alert('Backup imported successfully.');}
-   catch(e){alert('Could not import this file. Please choose a valid Time Budget Planner JSON backup.');}};
-  reader.readAsText(file);
- }
- function setup() {
-  $('syncNowBtn').onclick=()=>{state.baseStartTime=formatDateTimeLocal(new Date());persist();render();};
-  $('baseStartTime').addEventListener('change',e=>{if(e.target.value){state.baseStartTime=e.target.value;persist();render();}});
-  $('addTaskBtn').onclick=()=>{state.tasks.push({id:`task-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,title:'New Activity',duration:30,done:false});persist();render();};
-  $('addAlarmBtn').onclick=()=>{state.alarms.push({id:`alarm-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,label:'Custom Review',time:'12:00',enabled:true});persist();renderAlarms();};
-  $('closeClockModalBtn').onclick=closeClockModal;
-  $('clockModal').addEventListener('click',e=>{if(e.target===$('clockModal'))closeClockModal();});
-  $('saveClockBtn').onclick=()=>{const t=state.tasks.find(x=>x.id===currentModalTaskId);if(t){t.duration=tempModalMinutes;persist();render();}closeClockModal();};
-  document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>{tempModalMinutes=Math.min(1440,tempModalMinutes+Number(b.dataset.add));updateClockHandsDisplay();}));
-  $('clearDurationBtn').onclick=()=>{tempModalMinutes=0;updateClockHandsDisplay();};
-  $('saveNowBtn').onclick=()=>{const ok=persist();alert(ok?'Planner saved in this browser.':'Browser storage is unavailable. Please export a backup and use a persistent hosted version for reliable saving.');};
-  $('exportBtn').onclick=exportBackup;
-  $('importFile').addEventListener('change',e=>{importBackup(e.target.files[0]);e.target.value='';});
-  window.addEventListener('pagehide',persist);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist();});
-  window.addEventListener('beforeunload',persist);
- }
- function startAlarmChecker() {
-  const fired=new Set();
-  setInterval(()=>{
-   const now=new Date(),key=`${now.toDateString()}-${now.getHours()}:${now.getMinutes()}`;
-   if(now.getSeconds()!==0||fired.has(key))return;
-   const cur=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-   state.alarms.filter(a=>a.enabled&&a.time===cur).forEach(a=>{fired.add(key+a.id);alert(`🔔 Schedule Review Alarm: ${a.label}\nTime to review your schedule.`);});
-  },1000);
- }
- document.addEventListener('DOMContentLoaded',()=>{loadSaved();initClock();setup();render();startAlarmChecker();});
+(()=>{'use strict';
+const STORAGE_KEY='time_budget_app_state_v2', LEGACY_KEY='time_budget_app_state';
+const makeId=()=>`task-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+const defaultState=()=>({tasks:[
+{id:makeId(),title:'Email & Daily Planning',duration:30,done:false},
+{id:makeId(),title:'Focused Work',duration:120,done:false},
+{id:makeId(),title:'Meetings & Collaboration',duration:60,done:false},
+{id:makeId(),title:'Documentation & Follow-ups',duration:45,done:false}
+]});
+let state=defaultState(),currentModalTaskId=null,tempModalMinutes=0,isDraggingHand=false,clockEditMode='minutes';
+const $=id=>document.getElementById(id);
+function normalise(s){if(!s||typeof s!=='object')throw Error('Invalid backup');const d=defaultState();return{tasks:Array.isArray(s.tasks)?s.tasks.map((t,i)=>({id:String(t.id??`task-${Date.now()}-${i}`),title:String(t.title??'Office task'),duration:Math.max(0,Math.min(1440,Number.isFinite(Number(t.duration))?Math.round(Number(t.duration)):30)),done:Boolean(t.done)})):d.tasks};}
+function status(msg,ok=true){$('saveStatus').textContent=msg;$('saveStatus').className='text-xs '+(ok?'text-emerald-300':'text-amber-300');}
+function persist(){const raw=JSON.stringify(state);let saved=false;try{localStorage.setItem(STORAGE_KEY,raw);saved=localStorage.getItem(STORAGE_KEY)===raw;}catch(e){}try{sessionStorage.setItem(STORAGE_KEY,raw);}catch(e){}status(saved?'✓ Saved on this browser':'⚠ Session only — export a backup',saved);return saved;}
+function loadSaved(){let raw=null;try{raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem(LEGACY_KEY);}catch(e){}if(!raw){try{raw=sessionStorage.getItem(STORAGE_KEY);}catch(e){}}if(raw){try{state=normalise(JSON.parse(raw));status('✓ Previous planner data loaded');return;}catch(e){status('⚠ Saved data could not be read; starting with defaults',false);}}else status('New tracker — changes autosave when storage is available');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
+function summary(){$('totalDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+t.duration,0));$('completedDurationDisplay').textContent=fmt(state.tasks.reduce((n,t)=>n+(t.done?t.duration:0),0));}
+function render(){const body=$('taskTableBody');body.innerHTML='';$('emptyState').classList.toggle('hidden',state.tasks.length!==0);
+state.tasks.forEach(task=>{const tr=document.createElement('tr');tr.dataset.id=task.id;tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
+tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${esc(task.title)}" aria-label="Task description" class="task-title bg-transparent w-full focus:bg-slate-900/80 rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn inline-flex items-center gap-1 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><div class="flex justify-center items-center gap-2"><button class="copy-btn text-sky-300 p-1 text-xs font-semibold" title="Duplicate task">⧉ Copy</button><button class="delete-btn text-rose-400 p-1 font-bold text-base" aria-label="Delete task" title="Delete task">✕</button></div></td>`;
+const input=tr.querySelector('.task-title');input.addEventListener('change',e=>{task.title=e.target.value.trim()||'Untitled task';e.target.value=task.title;persist();});
+tr.querySelector('.duration-btn').onclick=()=>openClock(task.id);
+tr.querySelector('.done-btn').onclick=()=>{task.done=!task.done;persist();render();};
+tr.querySelector('.copy-btn').onclick=()=>{const copy={id:makeId(),title:task.title+' (Copy)',duration:task.duration,done:false};const i=state.tasks.findIndex(t=>t.id===task.id);state.tasks.splice(i+1,0,copy);persist();render();const row=[...$('taskTableBody').querySelectorAll('tr')].find(r=>r.dataset.id===copy.id);if(row){const field=row.querySelector('.task-title');field.focus();field.select();}};
+tr.querySelector('.delete-btn').onclick=()=>{if(confirm(`Delete "${task.title}"?`)){state.tasks=state.tasks.filter(t=>t.id!==task.id);persist();render();}};
+body.appendChild(tr);});
+summary();
+if(window.Sortable&&!body.dataset.sortable){Sortable.create(body,{handle:'.drag-handle',animation:150,onEnd:()=>{const order=[...body.querySelectorAll('tr')].map(r=>state.tasks.find(t=>t.id===r.dataset.id)).filter(Boolean);if(order.length===state.tasks.length){state.tasks=order;persist();render();}}});body.dataset.sortable='1';}}
+function openClock(id){currentModalTaskId=id;const t=state.tasks.find(x=>x.id===id);tempModalMinutes=t?t.duration:30;setMode('minutes');drawHands();$('clockModal').classList.remove('hidden');$('clockModal').classList.add('flex');}
+function closeClock(){$('clockModal').classList.add('hidden');$('clockModal').classList.remove('flex');isDraggingHand=false;}
+function setMode(mode){clockEditMode=mode;const hours=mode==='hours';$('setHoursModeBtn').setAttribute('aria-pressed',String(hours));$('setMinutesModeBtn').setAttribute('aria-pressed',String(!hours));$('setHoursModeBtn').className=hours?'rounded-lg border border-violet-400 bg-violet-950 py-2.5 text-sm font-bold text-violet-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';$('setMinutesModeBtn').className=!hours?'rounded-lg border border-sky-400 bg-sky-950 py-2.5 text-sm font-bold text-sky-200':'rounded-lg border border-slate-600 bg-slate-700 py-2.5 text-sm font-bold';$('clockInstruction').textContent=hours?'Drag around the dial to set hours. Purple = hours; use +1h for longer durations.':'Drag around the dial to set minutes (0–59). Blue = minutes.';drawHands();}
+function drawHands(){tempModalMinutes=Math.max(0,Math.min(1440,Math.round(tempModalMinutes)));$('modalDurationText').textContent=fmt(tempModalMinutes);const totalH=Math.floor(tempModalMinutes/60),h=totalH%12,m=tempModalMinutes%60,ha=h*30+(m/60)*30,ma=m*6;$('hourHand').setAttribute('transform',`rotate(${ha} 100 100)`);$('minuteHand').setAttribute('transform',`rotate(${ma} 100 100)`);const pt=(a,r)=>({x:100+r*Math.sin(a*Math.PI/180),y:100-r*Math.cos(a*Math.PI/180)}),hp=pt(ha,47),mp=pt(ma,71);$('hourTip').setAttribute('cx',hp.x);$('hourTip').setAttribute('cy',hp.y);$('minuteTip').setAttribute('cx',mp.x);$('minuteTip').setAttribute('cy',mp.y);$('hourHand').setAttribute('opacity',clockEditMode==='hours'?'1':'.78');$('minuteHand').setAttribute('opacity',clockEditMode==='minutes'?'1':'.72');$('hourTip').setAttribute('r',clockEditMode==='hours'?'6':'4');$('minuteTip').setAttribute('r',clockEditMode==='minutes'?'5':'3');}
+function initClock(){const g=$('clockTicks'),nums=$('clockNumbers');for(let i=0;i<12;i++){const a=i*Math.PI/6,x1=100+80*Math.sin(a),y1=100-80*Math.cos(a),x2=100+90*Math.sin(a),y2=100-90*Math.cos(a),line=document.createElementNS('http://www.w3.org/2000/svg','line');[['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(([k,v])=>line.setAttribute(k,v));g.appendChild(line);const label=document.createElementNS('http://www.w3.org/2000/svg','text'),r=68;label.setAttribute('x',100+r*Math.sin(a));label.setAttribute('y',100-r*Math.cos(a));label.textContent=String(i===0?12:i);nums.appendChild(label);}
+$('setHoursModeBtn').onclick=()=>setMode('hours');$('setMinutesModeBtn').onclick=()=>setMode('minutes');$('clockSvg').addEventListener('pointerdown',e=>{isDraggingHand=true;$('clockSvg').setPointerCapture?.(e.pointerId);drag(e);});$('clockSvg').addEventListener('pointermove',e=>{if(isDraggingHand)drag(e);});$('clockSvg').addEventListener('pointerup',()=>isDraggingHand=false);$('clockSvg').addEventListener('pointercancel',()=>isDraggingHand=false);}
+function drag(e){const rect=$('clockSvg').getBoundingClientRect();if(!rect.width||!rect.height)return;const x=(e.clientX-rect.left)*(200/rect.width)-100,y=(e.clientY-rect.top)*(200/rect.height)-100;let a=Math.atan2(x,-y);if(a<0)a+=Math.PI*2;if(clockEditMode==='hours'){let h=Math.round(a/(Math.PI*2)*12)%12;if(h===0)h=12;tempModalMinutes=Math.min(1440,h*60+tempModalMinutes%60);}else{const m=Math.round(a/(Math.PI*2)*60)%60;tempModalMinutes=Math.floor(tempModalMinutes/60)*60+m;}drawHands();}
+function exportBackup(){const blob=new Blob([JSON.stringify({app:'Office Task Duration Tracker',version:3,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`office-task-backup-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);status('✓ Backup exported. Keep the JSON file safe');}
+function importBackup(file){if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);state=normalise(data.state||data);persist();render();alert('Backup imported successfully.');}catch(e){alert('Could not import this file. Choose a valid planner JSON backup.');}};reader.readAsText(file);}
+function setup(){$('addTaskBtn').onclick=()=>{state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});persist();render();const rows=[...$('taskTableBody').querySelectorAll('tr')],field=rows[rows.length-1]?.querySelector('.task-title');if(field){field.focus();field.select();}};$('closeClockModalBtn').onclick=closeClock;$('clockModal').addEventListener('click',e=>{if(e.target===$('clockModal'))closeClock();});$('saveClockBtn').onclick=()=>{const t=state.tasks.find(x=>x.id===currentModalTaskId);if(t){t.duration=tempModalMinutes;persist();render();}closeClock();};document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{tempModalMinutes=Math.min(1440,tempModalMinutes+Number(b.dataset.add));drawHands();});$('clearDurationBtn').onclick=()=>{tempModalMinutes=0;drawHands();};$('saveNowBtn').onclick=()=>alert(persist()?'Planner saved in this browser.':'Browser storage may be unavailable. Please export a backup.');$('exportBtn').onclick=exportBackup;$('importFile').addEventListener('change',e=>{importBackup(e.target.files[0]);e.target.value='';});window.addEventListener('pagehide',persist);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persist();});window.addEventListener('beforeunload',persist);}
+document.addEventListener('DOMContentLoaded',()=>{loadSaved();initClock();setup();render();});
 })();
 </script>
-<script>
-// Register the service worker so Chrome can offer an app-like installation.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(err => {
-      console.warn('Planner service worker registration failed:', err);
-    });
-  });
-}
-</script>
+<script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(err=>console.warn('Service worker registration failed:',err)));}</script>
 </body>
 </html>
