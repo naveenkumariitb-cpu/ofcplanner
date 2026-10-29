@@ -22,7 +22,7 @@
  <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
   <div class="flex items-center gap-3"><div class="p-2 bg-indigo-600 rounded-lg">◷</div><div><h1 class="font-bold text-lg text-white">Office Task Duration Tracker</h1><p class="text-xs text-slate-400">Plan tasks • Cloud Synced</p></div></div>
   <div class="flex flex-wrap gap-2 items-center">
-   <!-- Bubble displaying Mobile App's Officework duration with manual Refresh button -->
+   <!-- Bubble displaying Mobile App's Officework duration fetched from cloud -->
    <div class="bg-sky-950/80 border border-sky-700/50 rounded-lg px-3 py-2 flex items-center gap-3">
     <div>
      <div class="text-xs text-sky-300">📱 Mobile Officework</div>
@@ -52,6 +52,7 @@
 (()=>{'use strict';
 const DESKTOP_STORAGE_KEY='office_planner_desktop_state';
 const JSONBIN_ID='6ae36c83ac6210605a5c67d5';
+const JSONBIN_API_KEY='$2a$10$Gjejlu7w2hofqswbK/6kNuaRXSF7lWb3o6lhBu1zl1PFrJZRgaC9e';
 const makeId=()=>`task-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const defaultState=()=>({tasks:[
 {id:makeId(),title:'Email & Daily Planning',duration:30,done:false},
@@ -67,7 +68,11 @@ async function fetchCloudMobileData() {
   const icon = $('refreshIcon');
   if (icon) icon.classList.add('spinning');
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`);
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`, {
+      headers: {
+        'X-Master-Key': JSONBIN_API_KEY
+      }
+    });
     const data = await res.json();
     const mins = data?.record?.officeworkDuration;
     if (typeof mins === 'number') {
@@ -79,7 +84,7 @@ async function fetchCloudMobileData() {
   } catch(e) {
     $('mobileOfficeDurationDisplay').textContent = '2h 0m';
   }
-  if (icon) setTimeout(() => icon.classList.remove('spinning'), 500);
+  if (icon) setTimeout(() => icon.classList.0 ? icon.classList.remove('spinning') : icon.classList.remove('spinning'), 500);
 }
 
 function fmt(min){min=Math.max(0,Math.round(min));return`${Math.floor(min/60)}h ${min%60}m`;}
