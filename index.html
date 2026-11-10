@@ -84,37 +84,66 @@ const defaultState=()=>({tasks:[
 {id:makeId(),title:'Email & Daily Planning',duration:30,done:false},
 {id:makeId(),title:'Focused Work',duration:120,done:false},
 {id:makeId(),title:'Meetings & Collaboration',duration:60,done:false}
-]});
+], officeworkDuration: 120});
+
 let state=defaultState(), currentModalTaskId=null, tempModalMinutes=0, isDraggingHand=false, clockEditMode='minutes';
 const $=id=>document.getElementById(id);
 
-function persist(){
+async function persist(){
   localStorage.setItem(DESKTOP_STORAGE_KEY,JSON.stringify(state));
-  $('saveStatus').textContent='✓ Saved locally';
+  $('saveStatus').textContent='Syncing to cloud...';
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_API_KEY
+      },
+      body: JSON.stringify(state)
+    });
+    if(res.ok) {
+      $('saveStatus').textContent='✓ Synced to cloud';
+    } else {
+      $('saveStatus').textContent='✓ Saved locally (Cloud sync warning)';
+    }
+  } catch(e) {
+    $('saveStatus').textContent='✓ Saved locally (Offline)';
+  }
 }
 
 function loadSaved(){
   const raw=localStorage.getItem(DESKTOP_STORAGE_KEY);
-  if(raw){try{state=JSON.parse(raw);}catch(e){}}
-  fetchCloudMobileData();
+  if(raw){try{state=JSON.parse(raw);render();}catch(e){}}
+  fetchCloudData();
 }
 
-async function fetchCloudMobileData() {
+async function fetchCloudData() {
   const icon = $('refreshIcon');
   if (icon) icon.classList.add('spinning');
+  $('saveStatus').textContent='Checking for cloud updates...';
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`, {
       headers: { 'X-Master-Key': JSONBIN_API_KEY }
     });
     const data = await res.json();
-    const mins = data?.record?.officeworkDuration;
+    const cloudRecord = data?.record;
+    
+    if (cloudRecord && Array.isArray(cloudRecord.tasks)) {
+      state = cloudRecord;
+      localStorage.setItem(DESKTOP_STORAGE_KEY, JSON.stringify(state));
+      render();
+    }
+    
+    const mins = cloudRecord?.officeworkDuration;
     if (typeof mins === 'number') {
       const h = Math.floor(mins / 60), m = mins % 60;
       $('mobileOfficeDurationDisplay').textContent = `${h}h ${m}m`;
     } else {
       $('mobileOfficeDurationDisplay').textContent = '2h 0m';
     }
+    $('saveStatus').textContent='✓ Synced with cloud';
   } catch(e) {
+    $('saveStatus').textContent='✓ Loaded from local storage';
     $('mobileOfficeDurationDisplay').textContent = '2h 0m';
   }
   if (icon) icon.classList.remove('spinning');
@@ -169,7 +198,7 @@ function initClock(){
   g.innerHTML=''; nums.innerHTML='';
   for(let i=0;i<12;i++){
     const a=i*Math.PI/6,x1=100+80*Math.sin(a),y1=100-80*Math.cos(a),x2=100+90*Math.sin(a),y2=100-90*Math.cos(a),line=document.createElementNS('http://www.w3.org/2000/svg','line');
-    [['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(([k,v])=>line.setAttribute(k,v));g.appendChild(line);
+    [['x1',x1],['y1',y1],['x2',x2],['y2',y2']].forEach(([k,v])=>line.setAttribute(k,v));g.appendChild(line);
     const label=document.createElementNS('http://www.w3.org/2000/svg','text'),r=68;
     label.setAttribute('x',100+r*Math.sin(a));label.setAttribute('y',100-r*Math.cos(a));label.textContent=String(i===0?12:i);nums.appendChild(label);
   }
@@ -209,7 +238,7 @@ function render(){
   const tr=document.createElement('tr');
   tr.dataset.id = task.id;
   tr.className=`hover:bg-slate-700/30 transition ${task.done?'bg-slate-900/40 text-slate-500':'text-slate-200'}`;
-  tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${task.title.replace(/"/g,'&quot;')}" class="task-title bg-transparent w-full rounded px-1.5 py-1 text-sm ${task.done?'line-string text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><div class="flex justify-center items-center gap-2"><button class="copy-btn text-sky-300 p-1 text-xs font-semibold" title="Duplicate task">⧉ Copy</button><button class="delete-btn text-rose-400 p-1 font-bold" title="Delete">✕</button></div></td>`;
+  tr.innerHTML=`<td class="py-3 px-2 text-center drag-handle text-slate-500">⣿</td><td class="py-3 px-3"><input type="text" value="${task.title.replace(/"/g,'&quot;')}" class="task-title bg-transparent w-full rounded px-1.5 py-1 text-sm ${task.done?'line-through text-slate-500':'text-white'}"></td><td class="py-3 px-3 text-center"><button class="duration-btn bg-slate-900 px-2.5 py-1.5 rounded border border-slate-700 text-xs font-mono text-indigo-300">🕒 ${fmt(task.duration)}</button></td><td class="py-3 px-3 text-center"><button class="done-btn w-24 py-1.5 rounded text-xs font-bold ${task.done?'bg-emerald-600 text-white':'bg-slate-700 text-slate-300'}">${task.done?'✓ DONE':'Pending'}</button></td><td class="py-3 px-2 text-center"><div class="flex justify-center items-center gap-2"><button class="copy-btn text-sky-300 p-1 text-xs font-semibold" title="Duplicate task">⧉ Copy</button><button class="delete-btn text-rose-400 p-1 font-bold" title="Delete">✕</button></div></td>`;
   tr.querySelector('.task-title').onchange=(e)=>{task.title=e.target.value;persist();};
   tr.querySelector('.duration-btn').onclick=()=>openClock(task.id);
   tr.querySelector('.done-btn').onclick=()=>{task.done=!task.done;persist();render();};
@@ -232,15 +261,21 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadSaved();
   initClock();
   render();
-  $('refreshMobileBtn').onclick = fetchCloudMobileData;
+  $('refreshMobileBtn').onclick = fetchCloudData;
   $('addTaskBtn').onclick=()=>{
     state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});
     persist(); render();
+    const body=$('taskTableBody');
     const rows=[...body.querySelectorAll('tr')];
     const f=rows[rows.length-1]?.querySelector('.task-title');
     if(f){f.focus();f.select();}
   };
-  $('saveNowBtn').onclick=()=>alert('Saved successfully in local storage.');
+  $('saveNowBtn').onclick=()=>persist();
+  
+  window.addEventListener('focus', fetchCloudData);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') fetchCloudData();
+  });
 });
 })();
 </script>
