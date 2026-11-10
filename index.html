@@ -264,10 +264,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('refreshMobileBtn').onclick = fetchCloudData;
   $('addTaskBtn').onclick=()=>{
     state.tasks.push({id:makeId(),title:'New Office Task',duration:30,done:false});
-    persist(); render();
-    const body=$('taskTableBody');
-    const rows=[...body.querySelectorAll('tr')];
-    const f=rows[rows.length-1]?.querySelector('.task-title');
+    persist(); 
+    render();
+    const taskBody = $('taskTableBody');
+    const rows = [...taskBody.querySelectorAll('tr')];
+    const f = rows[rows.length-1]?.querySelector('.task-title');
     if(f){f.focus();f.select();}
   };
   $('saveNowBtn').onclick=()=>persist();
