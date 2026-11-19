@@ -185,8 +185,10 @@ input,button{max-width:100%}
 <script>
 (()=>{'use strict';
 const DESKTOP_STORAGE_KEY='office_planner_desktop_state';
+const PENDING_QUEUE_KEY='office_planner_pending_cloud_queue';
 const JSONBIN_ID='6ae36c83ac6210605a5c67d5';
 const JSONBIN_API_KEY='$2a$10$Gjejlu7w2hofqswbK/6kNuaRXSF7lWb3o6lhBu1zl1PFrJZRgaC9e';
+const JSONBIN_URL=`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
 const makeId=()=>`task-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const defaultState=()=>({
@@ -195,16 +197,21 @@ const defaultState=()=>({
     {id:makeId(),title:'Focused Work',duration:120,done:false},
     {id:makeId(),title:'Meetings & Collaboration',duration:60,done:false}
   ],
-  archivedTasks:[]
+  archivedTasks:[],
+  updatedAt:0
 });
 
 let state=defaultState();
+let latestCloudOfficeworkMins=null;
+let hasPendingCloudSync=false;
 let currentModalTaskId=null;
 let tempModalMinutes=0;
 let isDraggingHand=false;
 let clockEditMode='minutes';
 let toastTimer=null;
 let pendingConfirmAction=null;
+let pushTimer=null;
+let isSyncing=false;
 
 const $=id=>document.getElementById(id);
 
@@ -248,16 +255,233 @@ function formatCompletedTimestamp(dateObj = new Date()){
   }
 }
 
-function persist(){
+function buildCloudPayload(tsOverride){
+  const ts = tsOverride || state.updatedAt || Date.now();
+  const payload = {
+    tasks: state.tasks,
+    archivedTasks: state.archivedTasks,
+    updatedAt: ts
+  };
+  if(typeof latestCloudOfficeworkMins === 'number'){
+    payload.officeworkDuration = latestCloudOfficeworkMins;
+  }
+  return payload;
+}
+
+function writePendingQueue(payload){
+  hasPendingCloudSync = true;
+  try {
+    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify({
+      payload,
+      queuedAt: Date.now()
+    }));
+  } catch(_){}
+}
+
+function clearPendingQueue(){
+  hasPendingCloudSync = false;
+  try {
+    localStorage.removeItem(PENDING_QUEUE_KEY);
+  } catch(_){}
+}
+
+function readPendingQueue(){
+  try {
+    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(parsed && parsed.payload){
+      hasPendingCloudSync = true;
+      return parsed.payload;
+    }
+  } catch(_){}
+  return null;
+}
+
+function saveLocalOnly(){
   try {
     localStorage.setItem(DESKTOP_STORAGE_KEY, JSON.stringify({
       tasks: state.tasks,
-      archivedTasks: state.archivedTasks
+      archivedTasks: state.archivedTasks,
+      updatedAt: state.updatedAt || 0
     }));
-    const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-    $('saveStatus').textContent=`✓ Saved locally (${timeStr})`;
   } catch (e) {
     $('saveStatus').textContent='⚠ Unable to save locally';
+  }
+}
+
+function scheduleCloudPush(immediate = false){
+  if(pushTimer) clearTimeout(pushTimer);
+  if(immediate){
+    pushTaskSyncToCloud(true);
+    return;
+  }
+  pushTimer = setTimeout(() => pushTaskSyncToCloud(false), 600);
+}
+
+function persist(immediateCloud = false){
+  state.updatedAt = Date.now();
+  saveLocalOnly();
+  const payload = buildCloudPayload(state.updatedAt);
+  writePendingQueue(payload);
+  const timeStr = new Date(state.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  $('saveStatus').textContent = navigator.onLine === false
+    ? `⚠ Saved locally (${timeStr}) • Queued for sync`
+    : `✓ Saved locally (${timeStr})`;
+  scheduleCloudPush(immediateCloud);
+}
+
+async function flushPendingQueue(showFeedback = false){
+  if(!JSONBIN_ID || !JSONBIN_API_KEY) return false;
+  const queued = readPendingQueue();
+  const payload = queued || (hasPendingCloudSync ? buildCloudPayload(state.updatedAt || Date.now()) : null);
+  if(!payload) return true;
+
+  if(typeof navigator !== 'undefined' && navigator.onLine === false){
+    const timeStr = new Date(payload.updatedAt || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `⚠ Offline — queued for sync (${timeStr})`;
+    return false;
+  }
+
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_API_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    clearPendingQueue();
+    const timeStr = new Date(payload.updatedAt || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `✓ Saved & synced (${timeStr})`;
+    if(showFeedback) showToast('Queued changes synced to cloud', '✓');
+    return true;
+  } catch(e) {
+    writePendingQueue(payload);
+    const timeStr = new Date(payload.updatedAt || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `⚠ Saved locally (${timeStr}) • Queued for sync`;
+    if(showFeedback) showToast('Saved locally; cloud sync queued', '⚠️');
+    return false;
+  }
+}
+
+async function pushTaskSyncToCloud(showFeedback = false){
+  if(!JSONBIN_ID || !JSONBIN_API_KEY) return;
+  const ts = state.updatedAt || Date.now();
+  const payload = buildCloudPayload(ts);
+  writePendingQueue(payload);
+
+  if(typeof navigator !== 'undefined' && navigator.onLine === false){
+    const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `⚠ Offline — queued for sync (${timeStr})`;
+    if(showFeedback) showToast('Offline — queued to sync when online', '⚠️');
+    return;
+  }
+
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_API_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    clearPendingQueue();
+    const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `✓ Saved & synced (${timeStr})`;
+    if(showFeedback) showToast('Saved & synced to cloud', '✓');
+  } catch(e) {
+    writePendingQueue(payload);
+    const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    $('saveStatus').textContent = `⚠ Saved locally (${timeStr}) • Queued for sync`;
+    if(showFeedback) showToast('Saved locally; cloud sync queued', '⚠️');
+  }
+}
+
+function applyCloudTasks(rec){
+  let changed = false;
+  if(Array.isArray(rec.tasks)){
+    state.tasks = rec.tasks.map(t => ({
+      id: t.id || makeId(),
+      title: String(t.title ?? ''),
+      duration: Math.max(0, Number(t.duration) || 0),
+      done: Boolean(t.done)
+    }));
+    changed = true;
+  }
+  if(Array.isArray(rec.archivedTasks)){
+    state.archivedTasks = rec.archivedTasks.map(t => ({
+      id: t.id || makeId(),
+      title: String(t.title ?? ''),
+      duration: Math.max(0, Number(t.duration) || 0),
+      done: true,
+      completedAt: t.completedAt || formatCompletedTimestamp(new Date())
+    }));
+    changed = true;
+  }
+  const cloudTs = Number(rec.updatedAt) || 0;
+  if(cloudTs > 0){
+    state.updatedAt = cloudTs;
+  } else if(changed && !state.updatedAt){
+    state.updatedAt = Date.now();
+  }
+  return changed;
+}
+
+async function fetchCloudMobileData() {
+  if(isSyncing) return;
+  isSyncing = true;
+  const icon = $('refreshIcon');
+  if (icon) icon.classList.add('spinning');
+  try {
+    // Retry any queued offline/failed pushes first before pulling
+    if(hasPendingCloudSync || readPendingQueue()){
+      await flushPendingQueue(false);
+    }
+
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`, {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY }
+    });
+    const data = await res.json();
+    const rec = data?.record;
+
+    const mins = rec?.officeworkDuration;
+    if (typeof mins === 'number') {
+      latestCloudOfficeworkMins = mins;
+      const h = Math.floor(mins / 60), m = mins % 60;
+      $('mobileOfficeDurationDisplay').textContent = `${h}h ${m}m`;
+    } else {
+      $('mobileOfficeDurationDisplay').textContent = '2h 0m';
+    }
+
+    const remoteTs = Number(rec?.updatedAt) || 0;
+    const localTs = Number(state.updatedAt) || 0;
+    const hasCloudTasks = Array.isArray(rec?.tasks) || Array.isArray(rec?.archivedTasks);
+    const initialSeedPull = (localTs === 0 && remoteTs === 0 && hasCloudTasks);
+
+    if(rec && typeof rec === 'object' && !hasPendingCloudSync){
+      if(remoteTs > localTs || initialSeedPull){
+        const applied = applyCloudTasks(rec);
+        if(applied){
+          saveLocalOnly();
+          render();
+        }
+      } else if(localTs > remoteTs && (state.tasks.length || state.archivedTasks.length)){
+        await pushTaskSyncToCloud(false);
+      }
+    }
+  } catch(e) {
+    $('mobileOfficeDurationDisplay').textContent = '2h 0m';
+    if(hasPendingCloudSync || readPendingQueue()){
+      $('saveStatus').textContent = '⚠ Offline — queued for sync';
+    }
+  } finally {
+    if (icon) icon.classList.remove('spinning');
+    isSyncing = false;
   }
 }
 
@@ -269,33 +493,14 @@ function loadSaved(){
       if(parsed && typeof parsed === 'object'){
         state.tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
         state.archivedTasks = Array.isArray(parsed.archivedTasks) ? parsed.archivedTasks : [];
+        state.updatedAt = Number(parsed.updatedAt) || 0;
       }
     }catch(e){
       state=defaultState();
     }
   }
+  readPendingQueue();
   fetchCloudMobileData();
-}
-
-async function fetchCloudMobileData() {
-  const icon = $('refreshIcon');
-  if (icon) icon.classList.add('spinning');
-  try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?t=${Date.now()}`, {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const data = await res.json();
-    const mins = data?.record?.officeworkDuration;
-    if (typeof mins === 'number') {
-      const h = Math.floor(mins / 60), m = mins % 60;
-      $('mobileOfficeDurationDisplay').textContent = `${h}h ${m}m`;
-    } else {
-      $('mobileOfficeDurationDisplay').textContent = '2h 0m';
-    }
-  } catch(e) {
-    $('mobileOfficeDurationDisplay').textContent = '2h 0m';
-  }
-  if (icon) icon.classList.remove('spinning');
 }
 
 function fmt(min){
@@ -416,7 +621,6 @@ function syncListsFromDOM(){
   [...activeBody.querySelectorAll('tr[data-id]')].forEach(tr => {
     const task = allTasksMap.get(tr.dataset.id);
     if(task){
-      // If moved from archive into active list, reset status & clear timestamp
       if(tr.dataset.origin === 'archive'){
         task.done = false;
         delete task.completedAt;
@@ -429,7 +633,6 @@ function syncListsFromDOM(){
   [...archiveBody.querySelectorAll('tr[data-id]')].forEach(tr => {
     const task = allTasksMap.get(tr.dataset.id);
     if(task){
-      // Automatically mark done & stamp when moved into archive bin
       task.done = true;
       if(!task.completedAt || tr.dataset.origin === 'active'){
         task.completedAt = formatCompletedTimestamp(new Date());
@@ -470,7 +673,6 @@ function setupSortables(){
     archiveBody.dataset.sortable = '1';
   }
 
-  // Allow dropping directly onto the empty placeholder box when archive has 0 rows
   if(!emptyDropzone.dataset.sortable){
     Sortable.create(emptyDropzone, {
       group: 'tasks',
@@ -501,7 +703,6 @@ function render(){
   body.innerHTML='';
   archiveBody.innerHTML='';
 
-  // Render Active Tasks
   state.tasks.forEach(task=>{
     const tr=document.createElement('tr');
     tr.dataset.id = task.id;
@@ -547,7 +748,6 @@ function render(){
 
   $('emptyState').classList.toggle('hidden', state.tasks.length > 0);
 
-  // Render Completed Archive Bin Tasks
   state.archivedTasks.forEach(task=>{
     const tr=document.createElement('tr');
     tr.dataset.id = task.id;
@@ -599,6 +799,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   initClock();
   render();
 
+  window.addEventListener('online', () => {
+    flushPendingQueue(true).then(() => fetchCloudMobileData());
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible'){
+      fetchCloudMobileData();
+    }
+  });
+
   $('refreshMobileBtn').onclick = fetchCloudMobileData;
 
   $('addTaskBtn').onclick=()=>{
@@ -611,7 +821,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
 
   $('saveNowBtn').onclick=()=>{
-    persist();
+    persist(true);
     showToast('Saved successfully in local storage.', '✓');
   };
 
