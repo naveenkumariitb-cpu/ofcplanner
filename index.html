@@ -58,7 +58,8 @@ input,button{max-width:100%}
  </div>
  <div class="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap items-center justify-between gap-2">
   <p id="saveStatus" role="status" class="text-xs text-emerald-300">Loading saved tracker…</p>
-  <div class="flex flex-wrap gap-2">
+  <div class="flex flex-wrap items-center gap-2">
+   <span id="syncStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full border bg-emerald-950/90 text-emerald-300 border-emerald-700/60">● Synced</span>
    <button id="saveNowBtn" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded font-medium transition">Save now</button>
   </div>
  </div>
@@ -215,6 +216,24 @@ let isSyncing=false;
 
 const $=id=>document.getElementById(id);
 
+function updateSyncBadge(mode = 'synced'){
+  const badge = $('syncStatusBadge');
+  if(!badge) return;
+  if(mode === 'syncing'){
+    badge.textContent = '↻ Syncing';
+    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full border bg-sky-950/90 text-sky-300 border-sky-700/60';
+    return;
+  }
+  if(hasPendingCloudSync){
+    const isOffline = (typeof navigator !== 'undefined' && navigator.onLine === false) || mode === 'offline';
+    badge.textContent = isOffline ? '● Offline' : '● Pending';
+    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full border bg-amber-950/90 text-amber-300 border-amber-700/60';
+    return;
+  }
+  badge.textContent = '● Synced';
+  badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full border bg-emerald-950/90 text-emerald-300 border-emerald-700/60';
+}
+
 function showToast(msg, icon='✓'){
   const banner=$('toastBanner');
   $('toastMessage').textContent=msg;
@@ -276,6 +295,7 @@ function writePendingQueue(payload){
       queuedAt: Date.now()
     }));
   } catch(_){}
+  updateSyncBadge();
 }
 
 function clearPendingQueue(){
@@ -283,18 +303,24 @@ function clearPendingQueue(){
   try {
     localStorage.removeItem(PENDING_QUEUE_KEY);
   } catch(_){}
+  updateSyncBadge('synced');
 }
 
 function readPendingQueue(){
   try {
     const raw = localStorage.getItem(PENDING_QUEUE_KEY);
-    if(!raw) return null;
+    if(!raw){
+      updateSyncBadge();
+      return null;
+    }
     const parsed = JSON.parse(raw);
     if(parsed && parsed.payload){
       hasPendingCloudSync = true;
+      updateSyncBadge();
       return parsed.payload;
     }
   } catch(_){}
+  updateSyncBadge();
   return null;
 }
 
@@ -335,14 +361,19 @@ async function flushPendingQueue(showFeedback = false){
   if(!JSONBIN_ID || !JSONBIN_API_KEY) return false;
   const queued = readPendingQueue();
   const payload = queued || (hasPendingCloudSync ? buildCloudPayload(state.updatedAt || Date.now()) : null);
-  if(!payload) return true;
+  if(!payload){
+    updateSyncBadge('synced');
+    return true;
+  }
 
   if(typeof navigator !== 'undefined' && navigator.onLine === false){
     const timeStr = new Date(payload.updatedAt || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
     $('saveStatus').textContent = `⚠ Offline — queued for sync (${timeStr})`;
+    updateSyncBadge('offline');
     return false;
   }
 
+  updateSyncBadge('syncing');
   try {
     const res = await fetch(JSONBIN_URL, {
       method: 'PUT',
@@ -376,10 +407,12 @@ async function pushTaskSyncToCloud(showFeedback = false){
   if(typeof navigator !== 'undefined' && navigator.onLine === false){
     const timeStr = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
     $('saveStatus').textContent = `⚠ Offline — queued for sync (${timeStr})`;
+    updateSyncBadge('offline');
     if(showFeedback) showToast('Offline — queued to sync when online', '⚠️');
     return;
   }
 
+  updateSyncBadge('syncing');
   try {
     const res = await fetch(JSONBIN_URL, {
       method: 'PUT',
@@ -437,8 +470,8 @@ async function fetchCloudMobileData() {
   isSyncing = true;
   const icon = $('refreshIcon');
   if (icon) icon.classList.add('spinning');
+  updateSyncBadge('syncing');
   try {
-    // Retry any queued offline/failed pushes first before pulling
     if(hasPendingCloudSync || readPendingQueue()){
       await flushPendingQueue(false);
     }
@@ -474,11 +507,13 @@ async function fetchCloudMobileData() {
         await pushTaskSyncToCloud(false);
       }
     }
+    updateSyncBadge();
   } catch(e) {
     $('mobileOfficeDurationDisplay').textContent = '2h 0m';
     if(hasPendingCloudSync || readPendingQueue()){
       $('saveStatus').textContent = '⚠ Offline — queued for sync';
     }
+    updateSyncBadge();
   } finally {
     if (icon) icon.classList.remove('spinning');
     isSyncing = false;
@@ -801,6 +836,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   window.addEventListener('online', () => {
     flushPendingQueue(true).then(() => fetchCloudMobileData());
+  });
+
+  window.addEventListener('offline', () => {
+    updateSyncBadge('offline');
   });
 
   document.addEventListener('visibilitychange', () => {
